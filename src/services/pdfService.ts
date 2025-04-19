@@ -1,5 +1,5 @@
 import { pdfjs } from 'react-pdf';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { extractSections, summarizeText } from './openai';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
@@ -56,14 +56,33 @@ export const processPDF = async (
     
     const extractedSections = await extractSections(pdfText, apiKey, options);
     
-    const sections: PDFSection[] = extractedSections.map((section: any, index: number) => ({
-      id: index + 1,
-      title: section.title || `Section ${index + 1}`,
-      content: section.content || '',
-      pageNumber: section.pageNumber || 1,
-    }));
+    const sections: PDFSection[] = await Promise.all(
+      extractedSections.map(async (section: any, index: number) => {
+        const summarizedContent = await summarizeText(
+          section.content || '',
+          apiKey,
+          {
+            ...options,
+            maxTokens: Math.min(options.maxTokens, 1000) // Limit tokens for each section
+          }
+        );
+        
+        return {
+          id: index + 1,
+          title: section.title || `Section ${index + 1}`,
+          content: summarizedContent || section.content || '',
+          pageNumber: section.pageNumber || 1,
+        };
+      })
+    );
     
-    return { sections, summarizedPdfUrl: null };
+    const arrayBuffer = await file.arrayBuffer();
+    const summarizedPdfBytes = await createSummarizedPDF(arrayBuffer, sections);
+    
+    const blob = new Blob([summarizedPdfBytes], { type: 'application/pdf' });
+    const summarizedPdfUrl = URL.createObjectURL(blob);
+    
+    return { sections, summarizedPdfUrl };
   } catch (error) {
     console.error('Error processing PDF:', error);
     throw new Error('Failed to process PDF');
@@ -72,7 +91,7 @@ export const processPDF = async (
 
 /**
  * Create a summarized PDF from the original PDF and extracted sections
- * This is a placeholder for now - in a real implementation, we would use pdf-lib to create a new PDF
+ * Uses pdf-lib to create a new PDF with summarized content while preserving structure
  */
 export const createSummarizedPDF = async (
   originalPdf: ArrayBuffer,
@@ -83,14 +102,70 @@ export const createSummarizedPDF = async (
     
     const newPdfDoc = await PDFDocument.create();
     
-    const pages = await newPdfDoc.copyPages(pdfDoc, pdfDoc.getPageIndices());
-    pages.forEach(page => {
-      newPdfDoc.addPage(page);
-    });
+    const helveticaFont = await newPdfDoc.embedFont(StandardFonts.Helvetica);
+    const helveticaBold = await newPdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    const originalPages = await newPdfDoc.copyPages(pdfDoc, pdfDoc.getPageIndices());
+    
+    for (const section of sections) {
+      const page = originalPages[Math.min(section.pageNumber - 1, originalPages.length - 1)];
+      const { width, height } = page.getSize();
+      const newPage = newPdfDoc.addPage([width, height]);
+      
+      newPage.drawText(section.title, {
+        x: 50,
+        y: newPage.getHeight() - 50,
+        size: 16,
+        font: helveticaBold,
+      });
+      
+      const contentLines = wrapText(section.content, 80); // Wrap at 80 characters
+      let yPosition = newPage.getHeight() - 80;
+      
+      for (const line of contentLines) {
+        newPage.drawText(line, {
+          x: 50,
+          y: yPosition,
+          size: 12,
+          font: helveticaFont,
+        });
+        yPosition -= 15; // Move down for the next line
+        
+        if (yPosition < 50) {
+          const { width, height } = page.getSize();
+          const continuationPage = newPdfDoc.addPage([width, height]);
+          yPosition = continuationPage.getHeight() - 50;
+        }
+      }
+    }
     
     return await newPdfDoc.save();
   } catch (error) {
     console.error('Error creating summarized PDF:', error);
     throw new Error('Failed to create summarized PDF');
   }
+};
+
+/**
+ * Helper function to wrap text at a specified character width
+ */
+const wrapText = (text: string, maxCharsPerLine: number): string[] => {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  
+  for (const word of words) {
+    if (currentLine.length + word.length + 1 <= maxCharsPerLine) {
+      currentLine += (currentLine.length > 0 ? ' ' : '') + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  
+  if (currentLine.length > 0) {
+    lines.push(currentLine);
+  }
+  
+  return lines;
 };
