@@ -82,20 +82,12 @@ export const extractTextFromPDFWithOpenAI = async (
 
 export const summarizeText = async (
   text: string,
-  apiKey: string,
   options = {
     model: 'gpt-4',
     temperature: 0.3,
     maxTokens: 1000,
   }
 ) => {
-  if (!openai) {
-    initializeOpenAI(apiKey);
-  }
-
-  if (!openai) {
-    throw new Error('OpenAI API not initialized');
-  }
 
   try {
     const response = await openai.chat.completions.create({
@@ -123,20 +115,12 @@ export const summarizeText = async (
 
 export const extractSections = async (
   text: string,
-  apiKey: string,
   options = {
     model: 'gpt-4',
     temperature: 0.3,
     maxTokens: 1000,
   }
 ) => {
-  if (!openai) {
-    initializeOpenAI(apiKey);
-  }
-
-  if (!openai) {
-    throw new Error('OpenAI API not initialized');
-  }
 
   try {
     const response = await openai.chat.completions.create({
