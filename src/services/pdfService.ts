@@ -1,8 +1,5 @@
-import { pdfjs } from 'react-pdf';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { extractSections, summarizeText } from './openai';
-
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+import { extractTextFromPDFWithOpenAI, summarizeText } from './openai';
 
 export interface PDFSection {
   id: number;
@@ -12,50 +9,25 @@ export interface PDFSection {
 }
 
 /**
- * Extract text from a PDF file
- */
-export const extractTextFromPDF = async (file: File): Promise<string> => {
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-    
-    let fullText = '';
-    
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      
-      fullText += `\n--- Page ${i} ---\n${pageText}\n`;
-    }
-    
-    return fullText;
-  } catch (error) {
-    console.error('Error extracting text from PDF:', error);
-    throw new Error('Failed to extract text from PDF');
-  }
-};
-
-/**
  * Process a PDF file and generate a summarized version
  */
 export const processPDF = async (
   file: File,
   apiKey: string,
   options = {
-    model: 'gpt-4',
+    model: 'gpt-4o',
     temperature: 0.3,
-    maxTokens: 2000,
+    maxTokens: 4000,
   }
 ): Promise<{ sections: PDFSection[], summarizedPdfUrl: string | null }> => {
   try {
-    const pdfText = await extractTextFromPDF(file);
+    console.log('Processing PDF with OpenAI...');
     
-    const extractedSections = await extractSections(pdfText, apiKey, options);
+    const extractedSections = await extractTextFromPDFWithOpenAI(file, options);
     
+    console.log('Extracted sections:', extractedSections);
+    
+    // Summarize each section
     const sections: PDFSection[] = await Promise.all(
       extractedSections.map(async (section: any, index: number) => {
         const summarizedContent = await summarizeText(
@@ -63,6 +35,7 @@ export const processPDF = async (
           apiKey,
           {
             ...options,
+            model: 'gpt-4', // Use gpt-4 for summarization
             maxTokens: Math.min(options.maxTokens, 1000) // Limit tokens for each section
           }
         );
@@ -85,7 +58,7 @@ export const processPDF = async (
     return { sections, summarizedPdfUrl };
   } catch (error) {
     console.error('Error processing PDF:', error);
-    throw new Error('Failed to process PDF');
+    throw new Error('Failed to process PDF: ' + (error instanceof Error ? error.message : String(error)));
   }
 };
 
