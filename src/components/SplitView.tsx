@@ -28,6 +28,7 @@ export function SplitView({ originalFile, summarizedPdf, onBack, sections }: Spl
     if (section) {
       setHoveredSection(section.id);
       setOriginalPageToShow(section.pageNumber);
+      setSummarizedPageToShow(section.id);
     } else {
       setHoveredSection(null);
       setOriginalPageToShow(null);

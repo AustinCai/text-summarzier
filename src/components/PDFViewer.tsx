@@ -112,7 +112,7 @@ export function PDFViewer({ file, onPageChange, highlightedSection, scrollToPage
                 key={`page_${index + 1}`}
                 ref={el => pageRefs.current[index] = el}
                 className={`mb-4 ${
-                  highlightedSection === index + 1 ? 'ring-2 ring-blue-500' : ''
+                  highlightedSection === index + 1 ? 'ring-2 ring-blue-500 shadow-lg bg-blue-50' : ''
                 }`}
               >
                 <Page
