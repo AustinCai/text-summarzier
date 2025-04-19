@@ -1,13 +1,9 @@
 import OpenAI from 'openai';
 
-let openai: OpenAI | null = null;
-
-export const initializeOpenAI = (apiKey: string) => {
-  openai = new OpenAI({
-    apiKey: apiKey,
-  });
-  return openai;
-};
+const openai = new OpenAI({
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
+  dangerouslyAllowBrowser: true,
+});
 
 export const summarizeText = async (
   text: string,
