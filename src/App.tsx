@@ -3,11 +3,8 @@ import './App.css'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
 import { Button } from './components/ui/button'
 import { useDropzone } from 'react-dropzone'
-import { FileText, Upload, Key } from 'lucide-react'
-import { Input } from './components/ui/input'
-import { Label } from './components/ui/label'
+import { FileText, Upload } from 'lucide-react'
 import { SplitView, PDFSection } from './components/SplitView'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { pdfjs } from 'react-pdf'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
@@ -16,8 +13,6 @@ function App() {
   const [file, setFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [apiKey, setApiKey] = useState<string>('')
-  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false)
   const [currentScreen, setCurrentScreen] = useState<'upload' | 'summary'>('upload')
   const [summarizedPdf, setSummarizedPdf] = useState<string | null>(null)
   const [sections, setSections] = useState<PDFSection[]>([])
@@ -50,17 +45,12 @@ function App() {
   const handleSummarize = async () => {
     if (!file) return
     
-    if (!apiKey) {
-      setShowApiKeyDialog(true)
-      return
-    }
-    
     setIsProcessing(true)
     
     try {
       const { processPDF } = await import('./services/pdfService');
       
-      const { sections, summarizedPdfUrl } = await processPDF(file, apiKey);
+      const { sections, summarizedPdfUrl } = await processPDF(file);
       
       setSections(sections);
       if (summarizedPdfUrl) {
@@ -74,16 +64,6 @@ function App() {
     } finally {
       setIsProcessing(false)
     }
-  }
-
-  const handleApiKeySubmit = () => {
-    if (!apiKey) {
-      setError('Please enter your OpenAI API key')
-      return
-    }
-    
-    setShowApiKeyDialog(false)
-    handleSummarize()
   }
 
   const handleBack = () => {
@@ -145,46 +125,6 @@ function App() {
           )}
         </CardContent>
       </Card>
-
-      {/* API Key Dialog */}
-      <Dialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enter OpenAI API Key</DialogTitle>
-            <DialogDescription>
-              Your API key is required to use the summarization feature. It will not be stored on our servers.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">OpenAI API Key</Label>
-              <div className="flex">
-                <Input
-                  id="apiKey"
-                  type="password"
-                  placeholder="sk-..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-              </div>
-              <p className="text-xs text-zinc-500">
-                You can find your API key in the <a href="https://platform.openai.com/account/api-keys" target="_blank" rel="noopener noreferrer" className="underline">OpenAI dashboard</a>.
-              </p>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowApiKeyDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleApiKeySubmit}>
-              <Key className="mr-2 h-4 w-4" />
-              Submit
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 
